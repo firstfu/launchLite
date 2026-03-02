@@ -21,7 +21,6 @@ struct AppGridView: View {
     @EnvironmentObject private var gridLayoutManager: GridLayoutManager
     @Query private var preferences: [UserPreferences]
 
-    @State private var draggedItemID: String?
     @State private var hoveredItemID: String?
     @State private var folderCreationTimer: Timer?
 
@@ -75,11 +74,11 @@ struct AppGridView: View {
         return LazyVGrid(columns: columns, spacing: 28) {
             ForEach(items) { item in
                 gridCell(for: item)
-                    .opacity(draggedItemID == item.id ? 0.3 : 1.0)
-                    .scaleEffect(hoveredItemID == item.id && draggedItemID != item.id ? 1.15 : 1.0)
+                    .opacity(gridLayoutManager.draggedItemID == item.id ? 0.3 : 1.0)
+                    .scaleEffect(hoveredItemID == item.id && gridLayoutManager.draggedItemID != item.id ? 1.15 : 1.0)
                     .animation(.easeOut(duration: 0.15), value: hoveredItemID)
                     .onDrag {
-                        draggedItemID = item.id
+                        gridLayoutManager.startDrag(itemID: item.id)
                         let provider = NSItemProvider()
                         provider.registerDataRepresentation(
                             forTypeIdentifier: UTType.launchLiteGridItem.identifier,
@@ -95,7 +94,6 @@ struct AppGridView: View {
                         delegate: GridCellDropDelegate(
                             targetItem: item,
                             gridLayoutManager: gridLayoutManager,
-                            draggedItemID: $draggedItemID,
                             hoveredItemID: $hoveredItemID,
                             folderCreationTimer: $folderCreationTimer
                         )
@@ -103,6 +101,13 @@ struct AppGridView: View {
             }
         }
         .padding(.horizontal, 60)
+        .onChange(of: gridLayoutManager.draggedItemID) { _, newValue in
+            if newValue == nil {
+                hoveredItemID = nil
+                folderCreationTimer?.invalidate()
+                folderCreationTimer = nil
+            }
+        }
         .transition(.asymmetric(
             insertion: .move(edge: .trailing).combined(with: .opacity),
             removal: .move(edge: .leading).combined(with: .opacity)
@@ -129,7 +134,6 @@ struct AppGridView: View {
 struct GridCellDropDelegate: DropDelegate {
     let targetItem: GridSlotItem
     let gridLayoutManager: GridLayoutManager
-    @Binding var draggedItemID: String?
     @Binding var hoveredItemID: String?
     @Binding var folderCreationTimer: Timer?
 
@@ -137,12 +141,13 @@ struct GridCellDropDelegate: DropDelegate {
         hoveredItemID = targetItem.id
 
         // Start folder creation timer when app is dragged onto another app
-        if case .app = targetItem, let dragID = draggedItemID, dragID != targetItem.id {
+        if case .app = targetItem,
+           let dragID = gridLayoutManager.draggedItemID,
+           dragID != targetItem.id {
             folderCreationTimer?.invalidate()
             folderCreationTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: false) { _ in
                 Task { @MainActor in
                     gridLayoutManager.createFolder(fromItemID: dragID, andItemID: targetItem.id)
-                    // Don't clear draggedItemID here — let performDrop handle cleanup
                     hoveredItemID = nil
                 }
             }
@@ -167,11 +172,11 @@ struct GridCellDropDelegate: DropDelegate {
 
         // Always clean up drag state and return true to prevent macOS drop artifacts
         defer {
-            draggedItemID = nil
+            gridLayoutManager.endDrag()
             hoveredItemID = nil
         }
 
-        guard let dragID = draggedItemID, dragID != targetItem.id else {
+        guard let dragID = gridLayoutManager.draggedItemID, dragID != targetItem.id else {
             return true
         }
 

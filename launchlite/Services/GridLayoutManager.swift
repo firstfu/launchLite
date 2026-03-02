@@ -5,6 +5,7 @@
 //  Created on 2026/3/2.
 //
 
+import AppKit
 import Combine
 import Foundation
 import SwiftData
@@ -16,11 +17,49 @@ final class GridLayoutManager: ObservableObject {
 
     @Published private(set) var allItems: [GridSlotItem] = []
 
+    /// The ID of the item currently being dragged, or nil if no drag is active.
+    @Published var draggedItemID: String?
+
     private let modelContext: ModelContext
     private var lastScannedApps: [ScannedApp] = []
+    private var dragCheckTimer: Timer?
 
     init(modelContext: ModelContext) {
         self.modelContext = modelContext
+    }
+
+    // MARK: - Drag State
+
+    /// Called when a drag begins. Installs a timer to detect when the mouse
+    /// button is released (covering the case where the system drag is cancelled
+    /// without calling `performDrop`).
+    func startDrag(itemID: String) {
+        draggedItemID = itemID
+        startDragCheckTimer()
+    }
+
+    /// Called when a drag ends (either via `performDrop` or timer-based detection).
+    func endDrag() {
+        draggedItemID = nil
+        stopDragCheckTimer()
+    }
+
+    private func startDragCheckTimer() {
+        stopDragCheckTimer()
+        // Use .common run loop mode so the timer fires during event-tracking
+        // (the run loop mode active during system drag sessions).
+        let timer = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
+            if NSEvent.pressedMouseButtons == 0 {
+                self?.endDrag()
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        dragCheckTimer = timer
+    }
+
+    private func stopDragCheckTimer() {
+        dragCheckTimer?.invalidate()
+        dragCheckTimer = nil
     }
 
     // MARK: - Sync

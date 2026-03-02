@@ -45,7 +45,10 @@ class LaunchpadPanel: NSPanel {
         isOpaque = false
         backgroundColor = .clear
         hasShadow = false
-        level = .screenSaver
+        // Use a level above all standard windows (popUpMenu=101) but below
+        // the system drag window level (kCGDraggingWindowLevel=500) so that
+        // drag previews render above the panel during drag-and-drop.
+        level = .init(rawValue: NSWindow.Level.popUpMenu.rawValue + 1)
         collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         isMovableByWindowBackground = false
         titlebarAppearsTransparent = true
