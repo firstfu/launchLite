@@ -23,7 +23,8 @@ struct AppIconView: View {
                     .resizable()
                     .aspectRatio(contentMode: .fit)
                     .frame(width: iconSize, height: iconSize)
-                    .scaleEffect(isHovering ? 1.08 : 1.0)
+                    .shadow(color: .black.opacity(0.3), radius: 6, x: 0, y: 3)
+                    .scaleEffect(isHovering ? 1.1 : 1.0)
                     .animation(.easeOut(duration: 0.15), value: isHovering)
 
                 if appState.isEditMode {
@@ -51,8 +52,9 @@ struct AppIconView: View {
             )
 
             Text(app.name)
-                .font(.system(size: 12))
+                .font(.system(size: 11))
                 .foregroundStyle(.white)
+                .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
                 .lineLimit(2)
                 .multilineTextAlignment(.center)
                 .frame(width: iconSize + 16)

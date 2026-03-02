@@ -13,27 +13,27 @@ struct SearchBarView: View {
     @FocusState private var isFocused: Bool
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 6) {
             Image(systemName: "magnifyingglass")
-                .foregroundStyle(.white.opacity(0.7))
-                .font(.system(size: 14))
+                .foregroundStyle(.white.opacity(0.6))
+                .font(.system(size: 13))
 
             TextField("Search", text: $appState.searchText)
                 .textFieldStyle(.plain)
-                .font(.system(size: 16))
+                .font(.system(size: 14))
                 .foregroundStyle(.white)
                 .focused($isFocused)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .frame(width: 260)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .frame(width: 220)
         .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(.white.opacity(0.15))
+            RoundedRectangle(cornerRadius: 8)
+                .fill(.white.opacity(0.10))
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(.white.opacity(0.2), lineWidth: 1)
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(.white.opacity(0.15), lineWidth: 0.5)
         )
         .onAppear {
             isFocused = true

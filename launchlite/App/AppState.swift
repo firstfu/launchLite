@@ -25,6 +25,7 @@ final class AppState: ObservableObject {
 
     let appScanner: AppScanner
     let modelContext: ModelContext
+    let gridLayoutManager: GridLayoutManager
 
     // MARK: - Private
 
@@ -35,6 +36,7 @@ final class AppState: ObservableObject {
     init(appScanner: AppScanner, modelContext: ModelContext) {
         self.appScanner = appScanner
         self.modelContext = modelContext
+        self.gridLayoutManager = GridLayoutManager(modelContext: modelContext)
 
         setupBindings()
     }
@@ -60,6 +62,13 @@ final class AppState: ObservableObject {
             }
             .assign(to: &$filteredApps)
 
+        // Sync grid layout whenever installed apps change
+        $installedApps
+            .sink { [weak self] apps in
+                self?.gridLayoutManager.syncWithScannedApps(apps)
+            }
+            .store(in: &cancellables)
+
         // Reset page to 0 when search text changes
         $searchText
             .removeDuplicates()
@@ -71,20 +80,24 @@ final class AppState: ObservableObject {
 
     // MARK: - Pagination
 
-    /// Number of apps that fit on a single page, based on UserPreferences grid size.
+    /// Whether we are currently in search mode (non-empty search text).
+    var isSearching: Bool { !searchText.isEmpty }
+
+    /// Number of items that fit on a single page, based on UserPreferences grid size.
     var appsPerPage: Int {
         let prefs = fetchPreferences()
         return prefs.gridRows * prefs.gridColumns
     }
 
-    /// Total number of pages needed for the current filtered apps.
+    /// Total number of pages needed.
     var totalPages: Int {
         let perPage = appsPerPage
         guard perPage > 0 else { return 1 }
-        return max(1, Int(ceil(Double(filteredApps.count) / Double(perPage))))
+        let totalCount = isSearching ? filteredApps.count : gridLayoutManager.totalItems
+        return max(1, Int(ceil(Double(totalCount) / Double(perPage))))
     }
 
-    /// Returns the apps for the given page index.
+    /// Returns the flat list of filtered apps for a search page (no folders, alphabetical).
     func apps(forPage page: Int) -> [ScannedApp] {
         let perPage = appsPerPage
         guard perPage > 0 else { return [] }
@@ -92,6 +105,11 @@ final class AppState: ObservableObject {
         guard start < filteredApps.count else { return [] }
         let end = min(start + perPage, filteredApps.count)
         return Array(filteredApps[start..<end])
+    }
+
+    /// Returns the unified grid slot items for a page (custom order with folders).
+    func gridItems(forPage page: Int) -> [GridSlotItem] {
+        gridLayoutManager.items(forPage: page, perPage: appsPerPage)
     }
 
     // MARK: - Visibility

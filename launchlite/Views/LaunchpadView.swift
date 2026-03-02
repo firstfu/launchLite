@@ -13,35 +13,28 @@ struct LaunchpadView: View {
     @EnvironmentObject private var appState: AppState
 
     var body: some View {
-        ZStack {
-            // Transparent background - tap on empty area to close
-            Color.clear
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    appState.hide()
-                }
+        VStack(spacing: 0) {
+            // Search bar at top
+            SearchBarView()
+                .padding(.top, 36)
 
-            VStack(spacing: 0) {
-                // Search bar at top
-                SearchBarView()
-                    .padding(.top, 40)
+            Spacer()
 
-                Spacer()
+            // App grid in center (pagination handles overflow, no ScrollView needed)
+            AppGridView()
 
-                // App grid in center
-                ScrollView {
-                    AppGridView()
-                }
-                .scrollIndicators(.hidden)
+            Spacer()
 
-                Spacer()
-
-                // Page indicator at bottom
-                PageIndicatorView()
-                    .padding(.bottom, 24)
-            }
+            // Page indicator at bottom
+            PageIndicatorView()
+                .padding(.bottom, 32)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            // Tap on empty area to close — child views' gestures take priority
+            appState.hide()
+        }
         .gesture(
             DragGesture(minimumDistance: 50)
                 .onEnded { value in

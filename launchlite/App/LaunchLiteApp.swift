@@ -112,6 +112,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func setupWindowController() {
         let launchpadView = LaunchpadView()
             .environmentObject(appState)
+            .environmentObject(appState.gridLayoutManager)
             .modelContainer(modelContainer)
         let wc = LaunchpadWindowController(rootView: launchpadView)
         wc.onDismiss = { [weak self] in

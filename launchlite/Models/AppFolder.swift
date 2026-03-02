@@ -15,6 +15,7 @@ final class AppFolder {
     var pageIndex: Int
     var gridRow: Int
     var gridColumn: Int
+    var sortOrder: Int
 
     @Relationship(deleteRule: .nullify, inverse: \AppItem.folder)
     var items: [AppItem]
@@ -25,6 +26,7 @@ final class AppFolder {
         pageIndex: Int = 0,
         gridRow: Int = 0,
         gridColumn: Int = 0,
+        sortOrder: Int = 0,
         items: [AppItem] = []
     ) {
         self.id = id
@@ -32,6 +34,7 @@ final class AppFolder {
         self.pageIndex = pageIndex
         self.gridRow = gridRow
         self.gridColumn = gridColumn
+        self.sortOrder = sortOrder
         self.items = items
     }
 }

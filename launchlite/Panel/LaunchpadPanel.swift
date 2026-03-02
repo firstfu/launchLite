@@ -18,8 +18,18 @@ class LaunchpadPanel: NSPanel {
     private let blurView: NSVisualEffectView = {
         let view = NSVisualEffectView()
         view.material = .fullScreenUI
+        view.appearance = NSAppearance(named: .darkAqua)
         view.blendingMode = .behindWindow
         view.state = .active
+        view.autoresizingMask = [.width, .height]
+        return view
+    }()
+
+    /// Dark overlay to simulate the native Launchpad dark tone.
+    private let darkOverlay: NSView = {
+        let view = NSView()
+        view.wantsLayer = true
+        view.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.35).cgColor
         view.autoresizingMask = [.width, .height]
         return view
     }()
@@ -41,9 +51,11 @@ class LaunchpadPanel: NSPanel {
         titlebarAppearsTransparent = true
         titleVisibility = .hidden
 
-        // Add blur background
+        // Add blur background and dark overlay
         blurView.frame = contentRect
         contentView?.addSubview(blurView, positioned: .below, relativeTo: nil)
+        darkOverlay.frame = contentRect
+        contentView?.addSubview(darkOverlay, positioned: .above, relativeTo: blurView)
     }
 
     override var canBecomeKey: Bool {
@@ -72,7 +84,7 @@ class LaunchpadPanel: NSPanel {
 
         // If the hit view is the content view itself or the blur view,
         // the user clicked on empty area - close the panel
-        if hitView === contentView || hitView === blurView {
+        if hitView === contentView || hitView === blurView || hitView === darkOverlay {
             dismiss()
         }
     }

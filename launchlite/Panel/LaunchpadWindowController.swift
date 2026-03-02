@@ -56,7 +56,7 @@ class LaunchpadWindowController: NSWindowController {
                 x: contentView.bounds.midX,
                 y: contentView.bounds.midY
             )
-            contentView.layer?.setAffineTransform(CGAffineTransform(scaleX: 1.1, y: 1.1))
+            contentView.layer?.setAffineTransform(CGAffineTransform(scaleX: 1.08, y: 1.08))
         }
 
         panel.makeKeyAndOrderFront(nil)
@@ -64,7 +64,7 @@ class LaunchpadWindowController: NSWindowController {
 
         // Animate in: fade + scale
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.3
+            context.duration = 0.25
             context.timingFunction = CAMediaTimingFunction(name: .easeOut)
             panel.animator().alphaValue = 1.0
             if let contentView = panel.contentView {
@@ -78,12 +78,12 @@ class LaunchpadWindowController: NSWindowController {
         guard let panel = window as? LaunchpadPanel, isPanelVisible else { return }
 
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.3
+            context.duration = 0.2
             context.timingFunction = CAMediaTimingFunction(name: .easeIn)
             panel.animator().alphaValue = 0.0
             if let contentView = panel.contentView {
                 contentView.wantsLayer = true
-                contentView.layer?.setAffineTransform(CGAffineTransform(scaleX: 0.95, y: 0.95))
+                contentView.layer?.setAffineTransform(CGAffineTransform(scaleX: 0.97, y: 0.97))
             }
         } completionHandler: { [weak self] in
             panel.orderOut(nil)

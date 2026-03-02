@@ -18,6 +18,7 @@ final class AppItem {
     var pageIndex: Int
     var gridRow: Int
     var gridColumn: Int
+    var sortOrder: Int
     var folderID: String?
     var lastUsed: Date?
 
@@ -30,6 +31,7 @@ final class AppItem {
         pageIndex: Int = 0,
         gridRow: Int = 0,
         gridColumn: Int = 0,
+        sortOrder: Int = 0,
         folderID: String? = nil,
         lastUsed: Date? = nil
     ) {
@@ -39,6 +41,7 @@ final class AppItem {
         self.pageIndex = pageIndex
         self.gridRow = gridRow
         self.gridColumn = gridColumn
+        self.sortOrder = sortOrder
         self.folderID = folderID
         self.lastUsed = lastUsed
     }
