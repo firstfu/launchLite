@@ -90,6 +90,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         setupInputServices()
         observeVisibility()
         loadPreferences()
+        observePreferenceChanges()
 
         // Initial app scan
         Task {
@@ -137,7 +138,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hotKeyManager = HotKeyManager { [weak self] in
             self?.appState.toggle()
         }
-        _ = hotKeyManager?.start()
+        let started = hotKeyManager?.start() ?? false
+        if !started {
+            print("[LaunchLite] HotKeyManager failed to start - check accessibility permissions")
+        }
 
         gestureMonitor = GestureMonitor { [weak self] in
             self?.appState.toggle()
@@ -166,16 +170,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Preferences
 
+    private func observePreferenceChanges() {
+        prefsCancellable = NotificationCenter.default
+            .publisher(for: .preferencesDidChange)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in
+                self?.loadPreferences()
+            }
+    }
+
     private func loadPreferences() {
         let context = ModelContext(modelContainer)
         let descriptor = FetchDescriptor<UserPreferences>()
         guard let prefs = try? context.fetch(descriptor).first else { return }
 
         hotKeyManager?.configure(hotkey: prefs.hotkey)
+        let started = hotKeyManager?.start() ?? false
+        if !started {
+            print("[LaunchLite] HotKeyManager failed to start - check accessibility permissions")
+        }
 
         if prefs.hotCornerEnabled {
             hotCornerMonitor?.configure(cornerPosition: prefs.hotCornerPosition)
             hotCornerMonitor?.start()
+        } else {
+            hotCornerMonitor?.stop()
         }
     }
 }

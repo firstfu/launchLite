@@ -8,6 +8,10 @@
 import Foundation
 import SwiftData
 
+extension Notification.Name {
+    static let preferencesDidChange = Notification.Name("LaunchLitePreferencesDidChange")
+}
+
 @Model
 final class UserPreferences {
     var gridRows: Int

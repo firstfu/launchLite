@@ -145,6 +145,15 @@ private struct ShortcutsTab: View {
         }
         .formStyle(.grouped)
         .padding()
+        .onChange(of: prefs.hotkey) { _, _ in
+            NotificationCenter.default.post(name: .preferencesDidChange, object: nil)
+        }
+        .onChange(of: prefs.hotCornerEnabled) { _, _ in
+            NotificationCenter.default.post(name: .preferencesDidChange, object: nil)
+        }
+        .onChange(of: prefs.hotCornerPosition) { _, _ in
+            NotificationCenter.default.post(name: .preferencesDidChange, object: nil)
+        }
     }
 }
 
@@ -155,6 +164,8 @@ private struct GeneralTab: View {
     let modelContext: ModelContext
     @State private var launchAtLogin: Bool = SMAppService.mainApp.status == .enabled
     @State private var showResetConfirmation = false
+    @State private var showLoginError = false
+    @State private var loginErrorMessage = ""
 
     var body: some View {
         Form {
@@ -187,6 +198,14 @@ private struct GeneralTab: View {
         }
         .formStyle(.grouped)
         .padding()
+        .onAppear {
+            launchAtLogin = SMAppService.mainApp.status == .enabled
+        }
+        .alert("開機啟動設定失敗", isPresented: $showLoginError) {
+            Button("確定") {}
+        } message: {
+            Text(loginErrorMessage)
+        }
     }
 
     private func setLaunchAtLogin(_ enabled: Bool) {
@@ -197,7 +216,10 @@ private struct GeneralTab: View {
                 try SMAppService.mainApp.unregister()
             }
         } catch {
+            print("[LaunchLite] SMAppService error: \(error)")
             launchAtLogin = SMAppService.mainApp.status == .enabled
+            loginErrorMessage = "無法設定開機啟動：\(error.localizedDescription)"
+            showLoginError = true
         }
     }
 
