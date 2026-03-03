@@ -135,9 +135,20 @@ struct AppGridView: View {
     // MARK: - Custom Order Grid (with folders and drag-and-drop)
 
     /// 自訂排序的網格視圖，支援資料夾顯示和拖放重排。
+    /// 使用整個網格區域的 DropDelegate，根據游標座標計算目標位置，不需要精確經過圖示。
     private func customOrderPageGrid(for page: Int) -> some View {
         let items = appState.gridItems(forPage: page)
-        return LazyVGrid(columns: columns, spacing: 32) {
+        let cols = prefs.gridColumns
+        let colSpacing: CGFloat = 28
+        let rowSpacing: CGFloat = 32
+        let hPadding: CGFloat = 64
+        let gridWidth = appState.viewportWidth
+        let availableWidth = gridWidth - 2 * hPadding
+        let cellWidth = cols > 0 ? max(1, (availableWidth - CGFloat(cols - 1) * colSpacing) / CGFloat(cols)) : 1
+        let cellHeight = iconSize + 58
+        let pageStartIndex = page * appState.appsPerPage
+
+        return LazyVGrid(columns: columns, spacing: rowSpacing) {
             ForEach(items) { item in
                 gridCell(for: item)
                     .opacity(gridLayoutManager.draggedItemID == item.id ? 0.3 : 1.0)
@@ -154,18 +165,24 @@ struct AppGridView: View {
                         }
                         return provider
                     }
-                    .onDrop(
-                        of: [.launchLiteGridItem],
-                        delegate: GridCellDropDelegate(
-                            targetItem: item,
-                            gridLayoutManager: gridLayoutManager,
-                            hoveredItemID: $hoveredItemID,
-                            folderCreationTimer: $folderCreationTimer
-                        )
-                    )
             }
         }
-        .padding(.horizontal, 64)
+        .padding(.horizontal, hPadding)
+        .onDrop(
+            of: [.launchLiteGridItem],
+            delegate: GridAreaDropDelegate(
+                gridLayoutManager: gridLayoutManager,
+                pageStartIndex: pageStartIndex,
+                columns: cols,
+                cellWidth: cellWidth,
+                cellHeight: cellHeight,
+                columnSpacing: colSpacing,
+                rowSpacing: rowSpacing,
+                horizontalPadding: hPadding,
+                hoveredItemID: $hoveredItemID,
+                folderCreationTimer: $folderCreationTimer
+            )
+        )
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: gridLayoutManager.allItems.map(\.id))
     }
 
@@ -183,78 +200,121 @@ struct AppGridView: View {
     }
 }
 
-// MARK: - Drop Delegate
+// MARK: - Grid Area Drop Delegate
 
-/// 網格儲存格的拖放委託，處理拖放進入、離開、更新和執行等事件。
-struct GridCellDropDelegate: DropDelegate {
-    let targetItem: GridSlotItem
+/// 整個網格區域的拖放委託，根據游標座標計算目標格位，實現原生 Launchpad 風格的即時重排。
+/// 不需要精確經過圖示，游標在網格任意位置都能觸發重排。
+struct GridAreaDropDelegate: DropDelegate {
     let gridLayoutManager: GridLayoutManager
+    let pageStartIndex: Int
+    let columns: Int
+    let cellWidth: CGFloat
+    let cellHeight: CGFloat
+    let columnSpacing: CGFloat
+    let rowSpacing: CGFloat
+    let horizontalPadding: CGFloat
     @Binding var hoveredItemID: String?
     @Binding var folderCreationTimer: Timer?
 
-    /// 拖放項目進入目標儲存格時呼叫，即時重排網格或啟動資料夾建立計時器。
+    /// 根據游標座標計算對應的 allItems 全域索引。
+    private func globalIndex(at location: CGPoint) -> Int? {
+        let x = location.x - horizontalPadding
+        let y = location.y
+
+        let colStep = cellWidth + columnSpacing
+        let rowStep = cellHeight + rowSpacing
+
+        let col = max(0, min(Int(x / colStep), columns - 1))
+        let row = max(0, Int(y / rowStep))
+
+        let localIndex = row * columns + col
+        let globalIdx = pageStartIndex + localIndex
+
+        guard globalIdx >= 0, globalIdx < gridLayoutManager.allItems.count else { return nil }
+        return globalIdx
+    }
+
     func dropEntered(info: DropInfo) {
-        guard let dragID = gridLayoutManager.draggedItemID,
-              dragID != targetItem.id else { return }
+        // 初次進入，由 dropUpdated 持續追蹤
+    }
+
+    /// 拖動過程中持續追蹤游標位置，即時重排或高亮目標資料夾。
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        guard let dragID = gridLayoutManager.draggedItemID else {
+            return DropProposal(operation: .cancel)
+        }
+
+        guard let targetIdx = globalIndex(at: info.location) else {
+            hoveredItemID = nil
+            folderCreationTimer?.invalidate()
+            folderCreationTimer = nil
+            return DropProposal(operation: .move)
+        }
+
+        let targetItem = gridLayoutManager.allItems[targetIdx]
+
+        // 游標在被拖曳項目自身的位置上 — 不做任何動作（保持資料夾計時器繼續）
+        if targetItem.id == dragID {
+            return DropProposal(operation: .move)
+        }
+
+        // 目標改變時才觸發重排或資料夾操作
+        guard hoveredItemID != targetItem.id else {
+            return DropProposal(operation: .move)
+        }
 
         hoveredItemID = targetItem.id
         folderCreationTimer?.invalidate()
         folderCreationTimer = nil
 
-        // If target is a folder, start timer to add to folder
         if case .folder = targetItem {
-            return
+            // 目標是資料夾 — 僅高亮，不重排
+        } else {
+            // 目標是 app — 立即重排
+            gridLayoutManager.liveReorder(draggedID: dragID, targetID: targetItem.id)
+
+            // 啟動資料夾建立計時器：若游標在同位置停留 0.8 秒則建立資料夾
+            let targetID = targetItem.id
+            let timer = Timer(timeInterval: 0.8, repeats: false) { _ in
+                gridLayoutManager.createFolder(fromItemID: dragID, andItemID: targetID)
+                hoveredItemID = nil
+            }
+            RunLoop.main.add(timer, forMode: .common)
+            folderCreationTimer = timer
         }
 
-        // Both are apps — live reorder the grid immediately
-        gridLayoutManager.liveReorder(draggedID: dragID, targetID: targetItem.id)
-
-        // Also start folder creation timer: if user hovers on same spot
-        // for 0.8s without moving, create a folder from the two apps.
-        let targetID = targetItem.id
-        let timer = Timer(timeInterval: 0.8, repeats: false) { _ in
-            gridLayoutManager.createFolder(fromItemID: dragID, andItemID: targetID)
-            hoveredItemID = nil
-        }
-        RunLoop.main.add(timer, forMode: .common)
-        folderCreationTimer = timer
+        return DropProposal(operation: .move)
     }
 
-    /// 拖放項目離開目標儲存格時呼叫，取消資料夾建立計時器。
     func dropExited(info: DropInfo) {
+        hoveredItemID = nil
         folderCreationTimer?.invalidate()
         folderCreationTimer = nil
-        if hoveredItemID == targetItem.id {
-            hoveredItemID = nil
-        }
     }
 
-    /// 拖放更新時回傳移動操作提案。
-    func dropUpdated(info: DropInfo) -> DropProposal? {
-        DropProposal(operation: .move)
-    }
-
-    /// 執行拖放操作：即時重排已在 dropEntered 完成，這裡僅處理資料夾放入和狀態清理。
+    /// 放下時處理資料夾放入或完成重排持久化。
     func performDrop(info: DropInfo) -> Bool {
-        folderCreationTimer?.invalidate()
-        folderCreationTimer = nil
-
         defer {
             gridLayoutManager.endDrag()
             hoveredItemID = nil
+            folderCreationTimer?.invalidate()
+            folderCreationTimer = nil
         }
 
-        guard let dragID = gridLayoutManager.draggedItemID, dragID != targetItem.id else {
+        guard let dragID = gridLayoutManager.draggedItemID,
+              let targetIdx = globalIndex(at: info.location),
+              targetIdx < gridLayoutManager.allItems.count else {
             return true
         }
 
-        // If target is a folder → add dragged app to folder
-        if case .folder(let folder) = targetItem {
+        let targetItem = gridLayoutManager.allItems[targetIdx]
+
+        // 放在資料夾上 → 加入資料夾
+        if case .folder(let folder) = targetItem, dragID != targetItem.id {
             gridLayoutManager.addToFolder(itemID: dragID, folder: folder)
-            return true
         }
 
-        // Reorder already happened in dropEntered; endDrag() will persist.
+        // 否則重排已在 dropUpdated 完成，endDrag() 會持久化
         return true
     }
 }
