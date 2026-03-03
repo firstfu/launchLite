@@ -26,7 +26,7 @@ struct LaunchpadView: View {
 
                 Spacer()
 
-                // App grid in center (pagination handles overflow, no ScrollView needed)
+                // App grid — vertically centered, but content top-left aligned
                 AppGridView()
                     .opacity(hasAppeared ? 1.0 : 0.0)
                     .scaleEffect(hasAppeared ? 1.0 : 0.96)

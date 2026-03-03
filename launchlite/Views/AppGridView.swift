@@ -52,7 +52,7 @@ struct AppGridView: View {
     private var searchGrid: some View {
         let currentApps = appState.apps(forPage: appState.currentPage)
 
-        return LazyVGrid(columns: columns, spacing: 32) {
+        return LazyVGrid(columns: columns, alignment: .leading, spacing: 32) {
             ForEach(currentApps) { app in
                 AppIconView(app: app, iconSize: iconSize)
             }
@@ -71,7 +71,7 @@ struct AppGridView: View {
     private var customOrderGrid: some View {
         let items = appState.gridItems(forPage: appState.currentPage)
 
-        return LazyVGrid(columns: columns, spacing: 32) {
+        return LazyVGrid(columns: columns, alignment: .leading, spacing: 32) {
             ForEach(items) { item in
                 gridCell(for: item)
                     .opacity(gridLayoutManager.draggedItemID == item.id ? 0.3 : 1.0)
