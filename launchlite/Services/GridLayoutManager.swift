@@ -20,6 +20,10 @@ final class GridLayoutManager: ObservableObject {
     /// The ID of the item currently being dragged, or nil if no drag is active.
     @Published var draggedItemID: String?
 
+    /// The folder currently expanded as an overlay. Setting this replaces the old popover approach
+    /// so that drag-and-drop stays within the same window (popover creates a separate NSWindow).
+    @Published var expandedFolder: AppFolder?
+
     private let modelContext: ModelContext
     private var lastScannedApps: [ScannedApp] = []
     private var dragCheckTimer: Timer?
@@ -184,9 +188,29 @@ final class GridLayoutManager: ObservableObject {
     }
 
     /// Moves an item identified by its GridSlotItem.id to a target index.
+    /// If the item is inside a folder, it is removed from the folder first.
     func moveItem(id: String, toIndex: Int) {
-        guard let fromIndex = allItems.firstIndex(where: { $0.id == id }) else { return }
-        moveItem(fromIndex: fromIndex, toIndex: toIndex)
+        // Item is in the top-level grid → simple reorder
+        if let fromIndex = allItems.firstIndex(where: { $0.id == id }) {
+            moveItem(fromIndex: fromIndex, toIndex: toIndex)
+            return
+        }
+
+        // Item might be inside a folder — extract bundleID from "app-{bundleID}" format
+        guard id.hasPrefix("app-") else { return }
+        let bundleID = String(id.dropFirst(4))
+        guard let appItem = fetchAppItem(bundleID: bundleID),
+              appItem.folder != nil else { return }
+
+        // Shift existing items first (while appItem is still in folder, unaffected by shift)
+        shiftSortOrdersFrom(toIndex)
+        // Then remove from folder and place at target position
+        appItem.folder = nil
+        appItem.sortOrder = toIndex
+
+        try? modelContext.save()
+        normalizeSortOrders()
+        rebuildSlotItems(scannedApps: currentScannedApps())
     }
 
     // MARK: - Folder Operations
@@ -238,9 +262,20 @@ final class GridLayoutManager: ObservableObject {
 
     /// Adds an app identified by slot ID to a folder.
     func addToFolder(itemID: String, folder: AppFolder) {
-        guard let slot = allItems.first(where: { $0.id == itemID }),
-              case .app(let scannedApp) = slot else { return }
-        addToFolder(scannedApp, folder: folder)
+        // Try top-level items first
+        if let slot = allItems.first(where: { $0.id == itemID }),
+           case .app(let scannedApp) = slot {
+            addToFolder(scannedApp, folder: folder)
+            return
+        }
+
+        // Handle items from inside other folders (e.g., dragging between folders)
+        guard itemID.hasPrefix("app-") else { return }
+        let bundleID = String(itemID.dropFirst(4))
+        guard let appItem = fetchAppItem(bundleID: bundleID) else { return }
+        appItem.folder = folder
+        try? modelContext.save()
+        rebuildSlotItems(scannedApps: currentScannedApps())
     }
 
     /// Removes an app from its folder back to the main grid.

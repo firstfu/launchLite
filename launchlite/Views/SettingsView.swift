@@ -42,6 +42,13 @@ struct SettingsView: View {
                 }
         }
         .frame(width: 480, height: 340)
+        .onAppear {
+            NSApp.activate(ignoringOtherApps: true)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                NSApp.keyWindow?.level = .floating
+                NSApp.keyWindow?.orderFrontRegardless()
+            }
+        }
     }
 }
 
@@ -87,7 +94,7 @@ private struct AppearanceTab: View {
             Section("圖示大小") {
                 HStack {
                     Text("大小")
-                    Slider(value: $prefs.iconSize, in: 48...128, step: 4)
+                    Slider(value: $prefs.iconSize, in: 48...160, step: 4)
                     Text("\(Int(prefs.iconSize)) pt")
                         .monospacedDigit()
                         .frame(width: 44, alignment: .trailing)
@@ -214,7 +221,7 @@ private struct GeneralTab: View {
 
         prefs.gridRows = 5
         prefs.gridColumns = 7
-        prefs.iconSize = 72
+        prefs.iconSize = 120
         prefs.hotkey = "⌥⌘L"
         prefs.hotCornerEnabled = false
         prefs.hotCornerPosition = 0

@@ -21,7 +21,7 @@ final class UserPreferences {
     init(
         gridRows: Int = 5,
         gridColumns: Int = 7,
-        iconSize: Double = 72,
+        iconSize: Double = 120,
         hotkey: String = "⌥⌘L",
         hotCornerEnabled: Bool = false,
         hotCornerPosition: Int = 0,

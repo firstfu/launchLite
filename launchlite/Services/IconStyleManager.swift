@@ -50,7 +50,7 @@ final class IconStyleManager {
     // MARK: - Icon Retrieval
 
     /// Returns the icon image for a given app bundle ID, styled appropriately.
-    func icon(forBundleID bundleID: String, size: CGFloat = 64) -> NSImage {
+    func icon(forBundleID bundleID: String, size: CGFloat = 512) -> NSImage {
         guard let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
             return fallbackIcon(size: size)
         }
@@ -61,14 +61,14 @@ final class IconStyleManager {
     }
 
     /// Returns the icon image for an app at a given URL.
-    func icon(forAppAt url: URL, size: CGFloat = 64) -> NSImage {
+    func icon(forAppAt url: URL, size: CGFloat = 512) -> NSImage {
         let icon = NSWorkspace.shared.icon(forFile: url.path)
         icon.size = NSSize(width: size, height: size)
         return icon
     }
 
     /// Returns icon data (PNG) for the given bundle ID.
-    func iconData(forBundleID bundleID: String, size: CGFloat = 64) -> Data? {
+    func iconData(forBundleID bundleID: String, size: CGFloat = 512) -> Data? {
         let image = icon(forBundleID: bundleID, size: size)
         return pngData(from: image)
     }

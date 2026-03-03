@@ -10,7 +10,7 @@ import SwiftData
 import UniformTypeIdentifiers
 
 /// Displays a folder with a 3x3 mini grid preview of contained apps.
-/// Tapping expands to show the full folder content overlay.
+/// Tapping opens the folder content overlay (managed by LaunchpadView).
 /// Supports renaming, deleting, and dragging apps in/out.
 struct FolderView: View {
     let folder: AppFolder
@@ -18,7 +18,6 @@ struct FolderView: View {
 
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var gridLayoutManager: GridLayoutManager
-    @State private var isExpanded = false
     @State private var isHovering = false
     @State private var isRenaming = false
     @State private var editedName: String = ""
@@ -76,11 +75,9 @@ struct FolderView: View {
                 editedName = folder.name
                 isRenaming = true
             } else {
-                isExpanded = true
+                // Open folder content as overlay (same window, not popover)
+                gridLayoutManager.expandedFolder = folder
             }
-        }
-        .popover(isPresented: $isExpanded, arrowEdge: .bottom) {
-            folderContent
         }
     }
 
@@ -118,98 +115,124 @@ struct FolderView: View {
             .padding(8)
         }
     }
+}
 
-    // MARK: - Expanded Folder Content
+// MARK: - Folder Content Overlay
 
-    private var folderContent: some View {
-        VStack(spacing: 14) {
-            // Editable folder name
-            if isRenaming {
-                TextField("資料夾名稱", text: $editedName, onCommit: {
-                    gridLayoutManager.renameFolder(folder, to: editedName)
-                    isRenaming = false
-                })
-                .textFieldStyle(.roundedBorder)
-                .font(.system(size: 16, weight: .semibold))
-                .multilineTextAlignment(.center)
-                .frame(width: 200)
-            } else {
-                Text(folder.name)
+/// Full-screen overlay showing expanded folder content.
+/// Placed in the same window as the grid (via LaunchpadView ZStack)
+/// so drag-and-drop works correctly — unlike .popover which creates a separate NSWindow.
+struct FolderContentOverlayView: View {
+    let folder: AppFolder
+
+    @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var gridLayoutManager: GridLayoutManager
+    @State private var isRenaming = false
+    @State private var editedName: String = ""
+
+    var body: some View {
+        ZStack {
+            // Dimmed background — tap to close
+            Color.black.opacity(0.3)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    gridLayoutManager.expandedFolder = nil
+                }
+
+            // Folder content card
+            VStack(spacing: 14) {
+                // Editable folder name
+                if isRenaming {
+                    TextField("資料夾名稱", text: $editedName, onCommit: {
+                        gridLayoutManager.renameFolder(folder, to: editedName)
+                        isRenaming = false
+                    })
+                    .textFieldStyle(.roundedBorder)
                     .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .onTapGesture(count: 2) {
-                        editedName = folder.name
-                        isRenaming = true
-                    }
-            }
+                    .multilineTextAlignment(.center)
+                    .frame(width: 200)
+                } else {
+                    Text(folder.name)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .onTapGesture(count: 2) {
+                            editedName = folder.name
+                            isRenaming = true
+                        }
+                }
 
-            let columns = Array(repeating: GridItem(.fixed(64), spacing: 18), count: 4)
-            LazyVGrid(columns: columns, spacing: 14) {
-                ForEach(folder.items, id: \.bundleID) { item in
-                    VStack(spacing: 5) {
-                        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: item.bundleID) {
-                            Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
-                                .resizable()
-                                .frame(width: 48, height: 48)
-                                .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
+                let columns = Array(repeating: GridItem(.fixed(64), spacing: 18), count: 4)
+                LazyVGrid(columns: columns, spacing: 14) {
+                    ForEach(folder.items, id: \.bundleID) { item in
+                        VStack(spacing: 5) {
+                            if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: item.bundleID) {
+                                Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
+                                    .resizable()
+                                    .frame(width: 48, height: 48)
+                                    .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
+                            }
+                            Text(item.name)
+                                .font(.system(size: 10, weight: .medium))
+                                .foregroundStyle(.white.opacity(0.9))
+                                .lineLimit(1)
                         }
-                        Text(item.name)
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundStyle(.white.opacity(0.9))
-                            .lineLimit(1)
-                    }
-                    .onTapGesture {
-                        appState.launchApp(bundleID: item.bundleID)
-                    }
-                    .onDrag {
-                        let provider = NSItemProvider()
-                        let dragID = "app-\(item.bundleID)"
-                        provider.registerDataRepresentation(
-                            forTypeIdentifier: UTType.launchLiteGridItem.identifier,
-                            visibility: .ownProcess
-                        ) { completion in
-                            completion(dragID.data(using: .utf8), nil)
-                            return nil
+                        .onTapGesture {
+                            appState.launchApp(bundleID: item.bundleID)
                         }
-                        return provider
-                    }
-                    .contextMenu {
-                        Button("從資料夾移出") {
-                            gridLayoutManager.removeFromFolder(item)
+                        .onDrag {
+                            let dragID = "app-\(item.bundleID)"
+                            gridLayoutManager.startDrag(itemID: dragID)
+                            // Close the overlay so the grid cells underneath can receive the drop.
+                            // The NSItemProvider is returned before SwiftUI processes the view update,
+                            // so the drag session survives the overlay removal.
+                            gridLayoutManager.expandedFolder = nil
+                            let provider = NSItemProvider()
+                            provider.registerDataRepresentation(
+                                forTypeIdentifier: UTType.launchLiteGridItem.identifier,
+                                visibility: .ownProcess
+                            ) { completion in
+                                completion(dragID.data(using: .utf8), nil)
+                                return nil
+                            }
+                            return provider
+                        }
+                        .contextMenu {
+                            Button("從資料夾移出") {
+                                gridLayoutManager.removeFromFolder(item)
+                                if folder.items.isEmpty {
+                                    gridLayoutManager.expandedFolder = nil
+                                }
+                            }
                         }
                     }
                 }
-            }
 
-            // Drop zone for adding apps to the folder
-            if folder.items.isEmpty {
-                Text("拖曳 app 到此處")
-                    .font(.system(size: 12))
-                    .foregroundStyle(.white.opacity(0.4))
-                    .frame(width: 200, height: 60)
+                if folder.items.isEmpty {
+                    Text("拖曳 app 到此處")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.white.opacity(0.4))
+                        .frame(width: 200, height: 60)
+                }
+            }
+            .padding(20)
+            .background(
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(.ultraThinMaterial)
+            )
+            .onDrop(of: [.launchLiteGridItem], isTargeted: nil) { providers in
+                handleFolderDrop(providers: providers)
             }
         }
-        .padding(20)
-        .background(
-            RoundedRectangle(cornerRadius: 16)
-                .fill(.ultraThinMaterial)
-        )
-        .onDrop(of: [.launchLiteGridItem], isTargeted: nil) { providers in
-            handleFolderDrop(providers: providers)
+        .transition(.opacity)
+        .onAppear {
+            editedName = folder.name
         }
     }
 
-    // MARK: - Drop Handling
-
     private func handleFolderDrop(providers: [NSItemProvider]) -> Bool {
-        for provider in providers {
-            provider.loadDataRepresentation(forTypeIdentifier: UTType.launchLiteGridItem.identifier) { data, _ in
-                guard let data, let dragID = String(data: data, encoding: .utf8) else { return }
-                Task { @MainActor in
-                    gridLayoutManager.addToFolder(itemID: dragID, folder: folder)
-                }
-            }
-        }
+        guard let dragID = gridLayoutManager.draggedItemID else { return false }
+        gridLayoutManager.addToFolder(itemID: dragID, folder: folder)
+        gridLayoutManager.endDrag()
         return true
     }
 }

@@ -11,37 +11,49 @@ import SwiftUI
 /// Designed to be embedded in the LaunchpadPanel via NSHostingView.
 struct LaunchpadView: View {
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var gridLayoutManager: GridLayoutManager
 
     @State private var hasAppeared = false
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Search bar at top
-            SearchBarView()
-                .padding(.top, 40)
-                .opacity(hasAppeared ? 1.0 : 0.0)
-                .offset(y: hasAppeared ? 0 : -10)
+        ZStack {
+            VStack(spacing: 0) {
+                // Search bar at top
+                SearchBarView()
+                    .padding(.top, 40)
+                    .opacity(hasAppeared ? 1.0 : 0.0)
+                    .offset(y: hasAppeared ? 0 : -10)
 
-            Spacer()
+                Spacer()
 
-            // App grid in center (pagination handles overflow, no ScrollView needed)
-            AppGridView()
-                .opacity(hasAppeared ? 1.0 : 0.0)
-                .scaleEffect(hasAppeared ? 1.0 : 0.96)
+                // App grid in center (pagination handles overflow, no ScrollView needed)
+                AppGridView()
+                    .opacity(hasAppeared ? 1.0 : 0.0)
+                    .scaleEffect(hasAppeared ? 1.0 : 0.96)
 
-            Spacer()
+                Spacer()
 
-            // Page indicator at bottom
-            PageIndicatorView()
-                .padding(.bottom, 36)
-                .opacity(hasAppeared ? 1.0 : 0.0)
-                .offset(y: hasAppeared ? 0 : 10)
+                // Page indicator at bottom
+                PageIndicatorView()
+                    .padding(.bottom, 36)
+                    .opacity(hasAppeared ? 1.0 : 0.0)
+                    .offset(y: hasAppeared ? 0 : 10)
+            }
+
+            // Folder content overlay — in the same window so drag-and-drop works
+            if let folder = gridLayoutManager.expandedFolder {
+                FolderContentOverlayView(folder: folder)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .contentShape(Rectangle())
         .onTapGesture {
             // Tap on empty area to close — child views' gestures take priority
-            appState.hide()
+            if gridLayoutManager.expandedFolder != nil {
+                gridLayoutManager.expandedFolder = nil
+            } else {
+                appState.hide()
+            }
         }
         .gesture(
             DragGesture(minimumDistance: 50)

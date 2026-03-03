@@ -63,9 +63,12 @@ class LaunchpadPanel: NSPanel {
         titleVisibility = .hidden
 
         // Add blur background and dark overlay
-        blurView.frame = contentRect
+        // Use contentView.bounds (local coordinates, origin 0,0) instead of
+        // contentRect (screen absolute coordinates) to avoid offset on external displays.
+        let localRect = contentView?.bounds ?? NSRect(origin: .zero, size: contentRect.size)
+        blurView.frame = localRect
         contentView?.addSubview(blurView, positioned: .below, relativeTo: nil)
-        darkOverlay.frame = contentRect
+        darkOverlay.frame = localRect
         contentView?.addSubview(darkOverlay, positioned: .above, relativeTo: blurView)
     }
 

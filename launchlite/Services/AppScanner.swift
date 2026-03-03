@@ -120,7 +120,7 @@ final class AppScanner: ObservableObject {
             ?? url.deletingPathExtension().lastPathComponent
 
         let icon = NSWorkspace.shared.icon(forFile: url.path)
-        icon.size = NSSize(width: 128, height: 128)
+        icon.size = NSSize(width: 512, height: 512)
 
         return ScannedApp(bundleID: bundleID, name: name, url: url, icon: icon)
     }
