@@ -13,20 +13,27 @@ struct PageIndicatorView: View {
 
     var body: some View {
         if appState.totalPages > 1 {
-            HStack(spacing: 7) {
+            HStack(spacing: 8) {
                 ForEach(0..<appState.totalPages, id: \.self) { index in
-                    Circle()
-                        .fill(index == appState.currentPage ? .white : .white.opacity(0.3))
-                        .frame(width: 6, height: 6)
-                        .animation(.easeInOut(duration: 0.2), value: appState.currentPage)
+                    let isActive = index == appState.currentPage
+                    Capsule()
+                        .fill(.white.opacity(isActive ? 0.95 : 0.3))
+                        .frame(width: isActive ? 18 : 7, height: 7)
+                        .shadow(color: .white.opacity(isActive ? 0.3 : 0.0), radius: 4)
+                        .animation(.spring(response: 0.35, dampingFraction: 0.7), value: appState.currentPage)
                         .onTapGesture {
-                            withAnimation(.easeInOut(duration: 0.3)) {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
                                 appState.currentPage = index
                             }
                         }
                 }
             }
+            .padding(.horizontal, 16)
             .padding(.vertical, 8)
+            .background(
+                Capsule()
+                    .fill(.white.opacity(0.06))
+            )
         }
     }
 }

@@ -41,7 +41,7 @@ struct SettingsView: View {
                     Label("一般", systemImage: "gear")
                 }
         }
-        .frame(width: 450, height: 320)
+        .frame(width: 480, height: 340)
     }
 }
 
@@ -235,9 +235,10 @@ private struct HotKeyRecorderButton: View {
             isRecording.toggle()
         } label: {
             Text(isRecording ? "請按下快捷鍵..." : hotkey)
-                .frame(minWidth: 100)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 4)
+                .font(.system(size: 13, weight: .medium, design: .rounded))
+                .frame(minWidth: 110)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
         }
         .buttonStyle(.bordered)
         .overlay(
@@ -245,9 +246,11 @@ private struct HotKeyRecorderButton: View {
                 if isRecording {
                     RoundedRectangle(cornerRadius: 6)
                         .stroke(Color.accentColor, lineWidth: 2)
+                        .shadow(color: Color.accentColor.opacity(0.3), radius: 4)
                 }
             }
         )
+        .animation(.easeOut(duration: 0.2), value: isRecording)
         .background {
             if isRecording {
                 HotKeyRecorderRepresentable(hotkey: $hotkey, isRecording: $isRecording)

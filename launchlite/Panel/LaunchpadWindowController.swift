@@ -18,6 +18,9 @@ class LaunchpadWindowController: NSWindowController {
     /// Called when the panel is dismissed by user interaction (Esc or click on empty area).
     var onDismiss: (() -> Void)?
 
+    /// Called when the user swipes horizontally on the trackpad to change pages.
+    var onPageSwipe: ((Int) -> Void)?
+
     /// Creates a new window controller with the given SwiftUI root view.
     convenience init<Content: View>(rootView: Content) {
         let screen = Self.screenWithMouse() ?? NSScreen.main ?? NSScreen.screens.first!
@@ -34,6 +37,11 @@ class LaunchpadWindowController: NSWindowController {
         panel.onDismiss = { [weak self] in
             self?.hidePanel()
             self?.onDismiss?()
+        }
+
+        // Wire page swipe to controller
+        panel.onPageSwipe = { [weak self] direction in
+            self?.onPageSwipe?(direction)
         }
     }
 
@@ -56,16 +64,16 @@ class LaunchpadWindowController: NSWindowController {
                 x: contentView.bounds.midX,
                 y: contentView.bounds.midY
             )
-            contentView.layer?.setAffineTransform(CGAffineTransform(scaleX: 1.08, y: 1.08))
+            contentView.layer?.setAffineTransform(CGAffineTransform(scaleX: 1.06, y: 1.06))
         }
 
         panel.makeKeyAndOrderFront(nil)
         isPanelVisible = true
 
-        // Animate in: fade + scale
+        // Animate in: fade + scale with spring-like timing
         NSAnimationContext.runAnimationGroup { context in
-            context.duration = 0.25
-            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            context.duration = 0.3
+            context.timingFunction = CAMediaTimingFunction(controlPoints: 0.25, 0.1, 0.25, 1.0)
             panel.animator().alphaValue = 1.0
             if let contentView = panel.contentView {
                 contentView.layer?.setAffineTransform(.identity)
@@ -83,7 +91,7 @@ class LaunchpadWindowController: NSWindowController {
             panel.animator().alphaValue = 0.0
             if let contentView = panel.contentView {
                 contentView.wantsLayer = true
-                contentView.layer?.setAffineTransform(CGAffineTransform(scaleX: 0.97, y: 0.97))
+                contentView.layer?.setAffineTransform(CGAffineTransform(scaleX: 0.98, y: 0.98))
             }
         } completionHandler: { [weak self] in
             panel.orderOut(nil)

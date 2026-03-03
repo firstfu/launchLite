@@ -12,22 +12,30 @@ import SwiftUI
 struct LaunchpadView: View {
     @EnvironmentObject private var appState: AppState
 
+    @State private var hasAppeared = false
+
     var body: some View {
         VStack(spacing: 0) {
             // Search bar at top
             SearchBarView()
-                .padding(.top, 36)
+                .padding(.top, 40)
+                .opacity(hasAppeared ? 1.0 : 0.0)
+                .offset(y: hasAppeared ? 0 : -10)
 
             Spacer()
 
             // App grid in center (pagination handles overflow, no ScrollView needed)
             AppGridView()
+                .opacity(hasAppeared ? 1.0 : 0.0)
+                .scaleEffect(hasAppeared ? 1.0 : 0.96)
 
             Spacer()
 
             // Page indicator at bottom
             PageIndicatorView()
-                .padding(.bottom, 32)
+                .padding(.bottom, 36)
+                .opacity(hasAppeared ? 1.0 : 0.0)
+                .offset(y: hasAppeared ? 0 : 10)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .contentShape(Rectangle())
@@ -40,11 +48,11 @@ struct LaunchpadView: View {
                 .onEnded { value in
                     let horizontal = value.translation.width
                     if horizontal < -50, appState.currentPage < appState.totalPages - 1 {
-                        withAnimation(.easeInOut(duration: 0.3)) {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                             appState.currentPage += 1
                         }
                     } else if horizontal > 50, appState.currentPage > 0 {
-                        withAnimation(.easeInOut(duration: 0.3)) {
+                        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                             appState.currentPage -= 1
                         }
                     }
@@ -52,6 +60,12 @@ struct LaunchpadView: View {
         )
         .task {
             await appState.refreshApps()
+        }
+        .onAppear {
+            hasAppeared = false
+            withAnimation(.easeOut(duration: 0.35).delay(0.05)) {
+                hasAppeared = true
+            }
         }
     }
 }

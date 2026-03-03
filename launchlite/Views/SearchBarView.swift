@@ -11,30 +11,58 @@ import SwiftUI
 struct SearchBarView: View {
     @EnvironmentObject private var appState: AppState
     @FocusState private var isFocused: Bool
+    @State private var animateFocus = false
 
     var body: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 8) {
             Image(systemName: "magnifyingglass")
-                .foregroundStyle(.white.opacity(0.6))
-                .font(.system(size: 13))
+                .foregroundStyle(.white.opacity(animateFocus ? 0.9 : 0.5))
+                .font(.system(size: 14, weight: .medium))
+                .animation(.easeOut(duration: 0.25), value: animateFocus)
 
             TextField("Search", text: $appState.searchText)
                 .textFieldStyle(.plain)
                 .font(.system(size: 14))
                 .foregroundStyle(.white)
                 .focused($isFocused)
+
+            if !appState.searchText.isEmpty {
+                Button {
+                    appState.searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.white.opacity(0.5))
+                        .font(.system(size: 12))
+                }
+                .buttonStyle(.plain)
+                .transition(.opacity.combined(with: .scale))
+            }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .frame(width: 220)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .frame(width: 260)
         .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(.white.opacity(0.10))
+            RoundedRectangle(cornerRadius: 10)
+                .fill(.white.opacity(0.08))
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(.ultraThinMaterial)
+                        .opacity(0.5)
+                )
         )
         .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(.white.opacity(0.15), lineWidth: 0.5)
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(
+                    animateFocus ? .white.opacity(0.25) : .white.opacity(0.12),
+                    lineWidth: animateFocus ? 1.0 : 0.5
+                )
+                .animation(.easeOut(duration: 0.25), value: animateFocus)
         )
+        .shadow(color: .black.opacity(0.2), radius: animateFocus ? 12 : 6, y: 2)
+        .animation(.easeOut(duration: 0.25), value: animateFocus)
+        .onChange(of: isFocused) { _, focused in
+            animateFocus = focused
+        }
         .onAppear {
             isFocused = true
         }

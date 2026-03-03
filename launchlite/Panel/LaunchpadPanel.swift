@@ -14,6 +14,14 @@ class LaunchpadPanel: NSPanel {
     /// Called when the panel is dismissed (via Esc or clicking empty area).
     var onDismiss: (() -> Void)?
 
+    /// Called when the user swipes horizontally to change pages.
+    /// Parameter: +1 for next page (swipe left), -1 for previous page (swipe right).
+    var onPageSwipe: ((Int) -> Void)?
+
+    /// Accumulated horizontal scroll delta during a trackpad swipe gesture.
+    private var scrollDeltaX: CGFloat = 0
+    private var isTrackpadScrolling = false
+
     /// The visual effect view providing the blur background.
     private let blurView: NSVisualEffectView = {
         let view = NSVisualEffectView()
@@ -29,7 +37,7 @@ class LaunchpadPanel: NSPanel {
     private let darkOverlay: NSView = {
         let view = NSView()
         view.wantsLayer = true
-        view.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.35).cgColor
+        view.layer?.backgroundColor = NSColor.black.withAlphaComponent(0.40).cgColor
         view.autoresizingMask = [.width, .height]
         return view
     }()
@@ -89,6 +97,49 @@ class LaunchpadPanel: NSPanel {
         // the user clicked on empty area - close the panel
         if hitView === contentView || hitView === blurView || hitView === darkOverlay {
             dismiss()
+        }
+    }
+
+    override func scrollWheel(with event: NSEvent) {
+        // Only handle trackpad scroll gestures (they report phase),
+        // ignore discrete mouse scroll wheels.
+        guard event.phase != [] || event.momentumPhase != [] else {
+            super.scrollWheel(with: event)
+            return
+        }
+
+        // Ignore momentum phase to prevent multiple page changes from inertia
+        guard event.momentumPhase == [] else { return }
+
+        switch event.phase {
+        case .began:
+            scrollDeltaX = 0
+            isTrackpadScrolling = true
+
+        case .changed:
+            guard isTrackpadScrolling else { return }
+            scrollDeltaX += event.scrollingDeltaX
+
+        case .ended:
+            guard isTrackpadScrolling else { return }
+            scrollDeltaX += event.scrollingDeltaX
+
+            let threshold: CGFloat = 50
+            if scrollDeltaX > threshold {
+                onPageSwipe?(-1)  // swipe right → previous page
+            } else if scrollDeltaX < -threshold {
+                onPageSwipe?(1)   // swipe left → next page
+            }
+
+            scrollDeltaX = 0
+            isTrackpadScrolling = false
+
+        case .cancelled:
+            scrollDeltaX = 0
+            isTrackpadScrolling = false
+
+        default:
+            break
         }
     }
 

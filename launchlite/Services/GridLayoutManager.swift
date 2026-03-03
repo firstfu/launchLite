@@ -215,10 +215,16 @@ final class GridLayoutManager: ObservableObject {
     /// Creates a folder from two slot item IDs.
     @discardableResult
     func createFolder(fromItemID idA: String, andItemID idB: String) -> AppFolder? {
+        print("[FOLDER] createFolder called: idA=\(idA), idB=\(idB)")
+        print("[FOLDER] allItems count: \(allItems.count)")
         guard let slotA = allItems.first(where: { $0.id == idA }),
               let slotB = allItems.first(where: { $0.id == idB }),
               case .app(let appA) = slotA,
-              case .app(let appB) = slotB else { return nil }
+              case .app(let appB) = slotB else {
+            print("[FOLDER] ❌ Guard failed — slotA: \(allItems.first(where: { $0.id == idA }) != nil), slotB: \(allItems.first(where: { $0.id == idB }) != nil)")
+            return nil
+        }
+        print("[FOLDER] ✅ Creating folder with: \(appA.name) + \(appB.name)")
         return createFolder(from: appA, and: appB)
     }
 

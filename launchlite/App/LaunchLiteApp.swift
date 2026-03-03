@@ -118,6 +118,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         wc.onDismiss = { [weak self] in
             self?.appState.hide()
         }
+        wc.onPageSwipe = { [weak self] direction in
+            guard let self else { return }
+            withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                if direction > 0, self.appState.currentPage < self.appState.totalPages - 1 {
+                    self.appState.currentPage += 1
+                } else if direction < 0, self.appState.currentPage > 0 {
+                    self.appState.currentPage -= 1
+                }
+            }
+        }
         windowController = wc
     }
 

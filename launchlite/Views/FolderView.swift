@@ -27,8 +27,8 @@ struct FolderView: View {
         VStack(spacing: 6) {
             ZStack(alignment: .topLeading) {
                 folderPreview
-                    .scaleEffect(isHovering ? 1.08 : 1.0)
-                    .animation(.easeOut(duration: 0.15), value: isHovering)
+                    .scaleEffect(isHovering ? 1.06 : 1.0)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isHovering)
 
                 if appState.isEditMode {
                     Button {
@@ -90,31 +90,39 @@ struct FolderView: View {
         let previewItems = Array(folder.items.prefix(9))
         let miniSize = iconSize / 4
 
-        return RoundedRectangle(cornerRadius: 14)
-            .fill(.white.opacity(0.20))
-            .frame(width: iconSize, height: iconSize)
-            .shadow(color: .black.opacity(0.3), radius: 6, x: 0, y: 3)
-            .overlay {
-                LazyVGrid(
-                    columns: Array(repeating: GridItem(.fixed(miniSize), spacing: 2), count: 3),
-                    spacing: 2
-                ) {
-                    ForEach(previewItems, id: \.bundleID) { item in
-                        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: item.bundleID) {
-                            Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
-                                .resizable()
-                                .frame(width: miniSize, height: miniSize)
-                        }
+        return ZStack {
+            RoundedRectangle(cornerRadius: 16)
+                .fill(.ultraThinMaterial)
+                .opacity(0.7)
+            RoundedRectangle(cornerRadius: 16)
+                .fill(.white.opacity(0.12))
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(.white.opacity(0.15), lineWidth: 0.5)
+        }
+        .frame(width: iconSize, height: iconSize)
+        .shadow(color: .black.opacity(isHovering ? 0.45 : 0.3), radius: isHovering ? 10 : 6, x: 0, y: isHovering ? 5 : 3)
+        .overlay {
+            LazyVGrid(
+                columns: Array(repeating: GridItem(.fixed(miniSize), spacing: 3), count: 3),
+                spacing: 3
+            ) {
+                ForEach(previewItems, id: \.bundleID) { item in
+                    if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: item.bundleID) {
+                        Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
+                            .resizable()
+                            .frame(width: miniSize, height: miniSize)
+                            .clipShape(RoundedRectangle(cornerRadius: 3))
                     }
                 }
-                .padding(6)
             }
+            .padding(8)
+        }
     }
 
     // MARK: - Expanded Folder Content
 
     private var folderContent: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 14) {
             // Editable folder name
             if isRenaming {
                 TextField("資料夾名稱", text: $editedName, onCommit: {
@@ -122,12 +130,12 @@ struct FolderView: View {
                     isRenaming = false
                 })
                 .textFieldStyle(.roundedBorder)
-                .font(.headline)
+                .font(.system(size: 16, weight: .semibold))
                 .multilineTextAlignment(.center)
                 .frame(width: 200)
             } else {
                 Text(folder.name)
-                    .font(.headline)
+                    .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(.white)
                     .onTapGesture(count: 2) {
                         editedName = folder.name
@@ -135,18 +143,19 @@ struct FolderView: View {
                     }
             }
 
-            let columns = Array(repeating: GridItem(.fixed(64), spacing: 16), count: 4)
-            LazyVGrid(columns: columns, spacing: 12) {
+            let columns = Array(repeating: GridItem(.fixed(64), spacing: 18), count: 4)
+            LazyVGrid(columns: columns, spacing: 14) {
                 ForEach(folder.items, id: \.bundleID) { item in
-                    VStack(spacing: 4) {
+                    VStack(spacing: 5) {
                         if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: item.bundleID) {
                             Image(nsImage: NSWorkspace.shared.icon(forFile: url.path))
                                 .resizable()
                                 .frame(width: 48, height: 48)
+                                .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
                         }
                         Text(item.name)
-                            .font(.system(size: 10))
-                            .foregroundStyle(.white)
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundStyle(.white.opacity(0.9))
                             .lineLimit(1)
                     }
                     .onTapGesture {
@@ -175,13 +184,16 @@ struct FolderView: View {
             // Drop zone for adding apps to the folder
             if folder.items.isEmpty {
                 Text("拖曳 app 到此處")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .font(.system(size: 12))
+                    .foregroundStyle(.white.opacity(0.4))
                     .frame(width: 200, height: 60)
             }
         }
-        .padding(16)
-        .background(.ultraThinMaterial)
+        .padding(20)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(.ultraThinMaterial)
+        )
         .onDrop(of: [.launchLiteGridItem], isTargeted: nil) { providers in
             handleFolderDrop(providers: providers)
         }

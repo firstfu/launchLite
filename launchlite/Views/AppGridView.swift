@@ -9,9 +9,9 @@ import SwiftUI
 import SwiftData
 import UniformTypeIdentifiers
 
-// Custom UTType for internal drag-and-drop (avoids macOS text rendering artifacts)
+// Custom UTType for internal drag-and-drop, declared in Info.plist as exported type
 extension UTType {
-    static let launchLiteGridItem = UTType(importedAs: "com.firstfu.tw.launchlite.griditem")
+    static let launchLiteGridItem = UTType(exportedAs: "com.firstfu.tw.launchlite.griditem")
 }
 
 /// Displays the grid of app icons for the current page, with support for
@@ -34,7 +34,7 @@ struct AppGridView: View {
 
     private var columns: [GridItem] {
         Array(
-            repeating: GridItem(.flexible(), spacing: 24),
+            repeating: GridItem(.flexible(), spacing: 28),
             count: prefs.gridColumns
         )
     }
@@ -52,18 +52,18 @@ struct AppGridView: View {
     private var searchGrid: some View {
         let currentApps = appState.apps(forPage: appState.currentPage)
 
-        return LazyVGrid(columns: columns, spacing: 28) {
+        return LazyVGrid(columns: columns, spacing: 32) {
             ForEach(currentApps) { app in
                 AppIconView(app: app, iconSize: iconSize)
             }
         }
-        .padding(.horizontal, 60)
+        .padding(.horizontal, 64)
         .transition(.asymmetric(
             insertion: .move(edge: .trailing).combined(with: .opacity),
             removal: .move(edge: .leading).combined(with: .opacity)
         ))
         .id("search-\(appState.currentPage)")
-        .animation(.easeInOut(duration: 0.3), value: appState.currentPage)
+        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: appState.currentPage)
     }
 
     // MARK: - Custom Order Grid (with folders and drag-and-drop)
@@ -71,13 +71,14 @@ struct AppGridView: View {
     private var customOrderGrid: some View {
         let items = appState.gridItems(forPage: appState.currentPage)
 
-        return LazyVGrid(columns: columns, spacing: 28) {
+        return LazyVGrid(columns: columns, spacing: 32) {
             ForEach(items) { item in
                 gridCell(for: item)
                     .opacity(gridLayoutManager.draggedItemID == item.id ? 0.3 : 1.0)
-                    .scaleEffect(hoveredItemID == item.id && gridLayoutManager.draggedItemID != item.id ? 1.15 : 1.0)
-                    .animation(.easeOut(duration: 0.15), value: hoveredItemID)
+                    .scaleEffect(hoveredItemID == item.id && gridLayoutManager.draggedItemID != item.id ? 1.12 : 1.0)
+                    .animation(.spring(response: 0.25, dampingFraction: 0.6), value: hoveredItemID)
                     .onDrag {
+                        print("[DRAG] onDrag started for item: \(item.id)")
                         gridLayoutManager.startDrag(itemID: item.id)
                         let provider = NSItemProvider()
                         provider.registerDataRepresentation(
@@ -100,7 +101,7 @@ struct AppGridView: View {
                     )
             }
         }
-        .padding(.horizontal, 60)
+        .padding(.horizontal, 64)
         .onChange(of: gridLayoutManager.draggedItemID) { _, newValue in
             if newValue == nil {
                 hoveredItemID = nil
@@ -113,7 +114,7 @@ struct AppGridView: View {
             removal: .move(edge: .leading).combined(with: .opacity)
         ))
         .id("grid-\(appState.currentPage)")
-        .animation(.easeInOut(duration: 0.3), value: appState.currentPage)
+        .animation(.spring(response: 0.4, dampingFraction: 0.85), value: appState.currentPage)
     }
 
     // MARK: - Grid Cell
@@ -138,6 +139,7 @@ struct GridCellDropDelegate: DropDelegate {
     @Binding var folderCreationTimer: Timer?
 
     func dropEntered(info: DropInfo) {
+        print("[DROP] dropEntered for target: \(targetItem.id), draggedItemID: \(gridLayoutManager.draggedItemID ?? "nil")")
         hoveredItemID = targetItem.id
 
         // Start folder creation timer when app is dragged onto another app
@@ -145,12 +147,20 @@ struct GridCellDropDelegate: DropDelegate {
            let dragID = gridLayoutManager.draggedItemID,
            dragID != targetItem.id {
             folderCreationTimer?.invalidate()
-            folderCreationTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: false) { _ in
-                Task { @MainActor in
-                    gridLayoutManager.createFolder(fromItemID: dragID, andItemID: targetItem.id)
-                    hoveredItemID = nil
-                }
+            print("[DROP] Starting 0.5s folder creation timer (drag: \(dragID) → target: \(targetItem.id))")
+            // Use .common run loop mode so the timer fires during drag sessions
+            // (which run in .eventTracking mode, not .default).
+            // Call createFolder directly — do NOT use Task { @MainActor in }
+            // because async Tasks may not execute during event-tracking RunLoop mode.
+            let timer = Timer(timeInterval: 0.5, repeats: false) { _ in
+                print("[DROP] Timer fired! Calling createFolder...")
+                gridLayoutManager.createFolder(fromItemID: dragID, andItemID: targetItem.id)
+                hoveredItemID = nil
             }
+            RunLoop.main.add(timer, forMode: .common)
+            folderCreationTimer = timer
+        } else {
+            print("[DROP] Skipped timer — targetItem is folder or dragID mismatch")
         }
     }
 
@@ -167,6 +177,7 @@ struct GridCellDropDelegate: DropDelegate {
     }
 
     func performDrop(info: DropInfo) -> Bool {
+        print("[DROP] performDrop called for target: \(targetItem.id)")
         folderCreationTimer?.invalidate()
         folderCreationTimer = nil
 
@@ -177,6 +188,7 @@ struct GridCellDropDelegate: DropDelegate {
         }
 
         guard let dragID = gridLayoutManager.draggedItemID, dragID != targetItem.id else {
+            print("[DROP] performDrop — no dragID or same item, returning early")
             return true
         }
 
