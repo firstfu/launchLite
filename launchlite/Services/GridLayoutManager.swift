@@ -34,6 +34,9 @@ final class GridLayoutManager: ObservableObject {
         self.modelContext = modelContext
     }
 
+    /// Whether the item order was changed during a live drag and needs persisting.
+    private var needsPersistOnDragEnd = false
+
     // MARK: - Drag State
 
     /// Called when a drag begins. Installs a timer to detect when the mouse
@@ -41,13 +44,47 @@ final class GridLayoutManager: ObservableObject {
     /// without calling `performDrop`).
     func startDrag(itemID: String) {
         draggedItemID = itemID
+        needsPersistOnDragEnd = false
         startDragCheckTimer()
     }
 
     /// Called when a drag ends (either via `performDrop` or timer-based detection).
     func endDrag() {
+        if needsPersistOnDragEnd {
+            persistCurrentOrder()
+            needsPersistOnDragEnd = false
+        }
         draggedItemID = nil
         stopDragCheckTimer()
+    }
+
+    // MARK: - Live Reorder (during drag)
+
+    /// Reorders `allItems` in real-time as the user drags over grid cells.
+    /// Does NOT save to SwiftData — call `endDrag()` to persist.
+    func liveReorder(draggedID: String, targetID: String) {
+        guard draggedID != targetID,
+              let fromIndex = allItems.firstIndex(where: { $0.id == draggedID }),
+              let toIndex = allItems.firstIndex(where: { $0.id == targetID }) else { return }
+
+        let item = allItems.remove(at: fromIndex)
+        allItems.insert(item, at: toIndex)
+        needsPersistOnDragEnd = true
+    }
+
+    /// Saves the current `allItems` order to SwiftData.
+    private func persistCurrentOrder() {
+        for (index, slot) in allItems.enumerated() {
+            switch slot {
+            case .app(let scannedApp):
+                if let appItem = fetchAppItem(bundleID: scannedApp.bundleID) {
+                    appItem.sortOrder = index
+                }
+            case .folder(let folder):
+                folder.sortOrder = index
+            }
+        }
+        try? modelContext.save()
     }
 
     /// 啟動拖曳檢查計時器，偵測滑鼠釋放以結束拖曳狀態。
